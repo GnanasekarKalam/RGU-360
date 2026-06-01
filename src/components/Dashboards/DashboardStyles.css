@@ -1,0 +1,350 @@
+/* src/components/Dashboards/DashboardStyles.css */
+/* Shared dashboard styles for HOD and Management dashboards */
+
+.dashboard-container {
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+}
+
+.dashboard-container h1 {
+  color: #1890ff;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* KPI Card Styling */
+.kpi-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  border: 1px solid #f0f0f0;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.kpi-card .ant-statistic-title {
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.kpi-card .ant-statistic-content {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* Tabs Styling */
+.dashboard-container .ant-tabs {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-container .ant-tabs-tab {
+  font-weight: 500;
+  color: #666;
+  border-bottom: 2px solid transparent !important;
+  transition: all 0.3s ease;
+}
+
+.dashboard-container .ant-tabs-tab-active {
+  color: #1890ff;
+  border-bottom: 2px solid #1890ff !important;
+}
+
+.dashboard-container .ant-tabs-tab:hover {
+  color: #1890ff;
+}
+
+/* Card Styling */
+.dashboard-container .ant-card {
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.dashboard-container .ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-container .ant-card-head {
+  background: linear-gradient(135deg, #1890ff 0%, #52c41a 100%);
+  color: white;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.dashboard-container .ant-card-head-title {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Table Styling */
+.dashboard-container .ant-table {
+  background: transparent;
+}
+
+.dashboard-container .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-weight: 600;
+  color: #1890ff;
+  border-bottom: 2px solid #1890ff;
+}
+
+.dashboard-container .ant-table-tbody > tr {
+  transition: all 0.2s ease;
+}
+
+.dashboard-container .ant-table-tbody > tr:hover > td {
+  background: #f0f8ff;
+}
+
+.dashboard-container .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Progress Bar Styling */
+.dashboard-container .ant-progress {
+  transition: all 0.3s ease;
+}
+
+.dashboard-container .ant-progress-circle-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* List Styling */
+.dashboard-container .ant-list-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.dashboard-container .ant-list-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-container .ant-list-item:hover {
+  background: #fafafa;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.dashboard-container .ant-list-item-meta-title {
+  font-weight: 500;
+  color: #262626;
+}
+
+.dashboard-container .ant-list-item-meta-description {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Tag Styling */
+.dashboard-container .ant-tag {
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 4px 12px;
+}
+
+.dashboard-container .ant-tag-blue {
+  background: #e6f7ff;
+  border-color: #91d5ff;
+  color: #1890ff;
+}
+
+.dashboard-container .ant-tag-green {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #52c41a;
+}
+
+.dashboard-container .ant-tag-orange {
+  background: #fff7e6;
+  border-color: #ffd591;
+  color: #fa8c16;
+}
+
+.dashboard-container .ant-tag-red {
+  background: #fff1f0;
+  border-color: #ffa39e;
+  color: #ff4d4f;
+}
+
+.dashboard-container .ant-tag-volcano {
+  background: #fff2e8;
+  border-color: #ffbb96;
+  color: #fa541c;
+}
+
+/* Badge Styling */
+.dashboard-container .ant-badge-count {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+/* Chart Styling */
+.dashboard-container .recharts-surface {
+  border-radius: 8px;
+}
+
+.dashboard-container .recharts-wrapper {
+  margin: 0 -12px;
+}
+
+.dashboard-container .recharts-text {
+  font-size: 12px;
+}
+
+.dashboard-container .recharts-legend-wrapper {
+  padding-top: 16px;
+}
+
+/* Button Styling */
+.dashboard-container .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #0050b3 100%);
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.dashboard-container .ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+/* Empty State Styling */
+.dashboard-container .ant-empty {
+  color: #999;
+}
+
+.dashboard-container .ant-empty-description {
+  color: #bfbfbf;
+}
+
+/* Spinner Styling */
+.dashboard-container .ant-spin {
+  color: #1890ff;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+
+  .dashboard-container h1 {
+    font-size: 22px;
+    margin-bottom: 16px;
+  }
+
+  .kpi-card .ant-statistic-content {
+    font-size: 24px;
+  }
+
+  .dashboard-container .ant-card-head-title {
+    font-size: 13px;
+  }
+
+  .dashboard-container .ant-tabs-tab {
+    font-size: 12px;
+  }
+
+  .dashboard-container .ant-table-small > .ant-table-body > table > thead > tr > th {
+    padding: 8px 4px;
+  }
+}
+
+/* Color Schemes for Different Metrics */
+.metric-success {
+  color: #52c41a;
+}
+
+.metric-warning {
+  color: #faad14;
+}
+
+.metric-error {
+  color: #ff4d4f;
+}
+
+.metric-info {
+  color: #1890ff;
+}
+
+/* Gradient Backgrounds */
+.gradient-blue {
+  background: linear-gradient(135deg, #1890ff 0%, #0050b3 100%);
+}
+
+.gradient-green {
+  background: linear-gradient(135deg, #52c41a 0%, #274916 100%);
+}
+
+.gradient-orange {
+  background: linear-gradient(135deg, #faad14 0%, #d48806 100%);
+}
+
+.gradient-red {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+}
+
+/* Animation Classes */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-container .ant-card {
+  animation: slideInUp 0.4s ease-out;
+}
+
+/* Tooltip Styling */
+.dashboard-container .ant-tooltip-inner {
+  background: #262626;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 300px;
+}
+
+.dashboard-container .ant-tooltip-arrow-content {
+  background-color: #262626;
+}
+
+/* Print Styles */
+@media print {
+  .dashboard-container {
+    background: white;
+    padding: 0;
+  }
+
+  .dashboard-container .ant-btn {
+    display: none;
+  }
+
+  .dashboard-container .ant-card {
+    page-break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #d9d9d9;
+  }
+}

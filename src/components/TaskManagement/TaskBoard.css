@@ -1,0 +1,141 @@
+/* src/components/TaskManagement/TaskBoard.css */
+
+.task-board {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  min-height: 600px;
+}
+
+.task-column {
+  flex: 0 0 300px;
+  background-color: #fafafa;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e8e8e8;
+  transition: background-color 0.2s;
+}
+
+.task-column.dragging-over {
+  background-color: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #d9d9d9;
+}
+
+.column-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #262626;
+}
+
+.tasks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 400px;
+}
+
+.task-card {
+  cursor: move;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+}
+
+.task-card.dragging {
+  opacity: 0.5;
+}
+
+.task-card-content {
+  padding: 12px;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.task-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-word;
+  flex: 1;
+}
+
+.task-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.task-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background-color: #d9d9d9;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #52c41a;
+  transition: width 0.3s;
+}
+
+.task-progress span {
+  font-size: 12px;
+  color: #666;
+  min-width: 32px;
+  text-align: right;
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #999;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .task-board {
+    flex-direction: column;
+  }
+
+  .task-column {
+    flex: 1;
+  }
+
+  .tasks-container {
+    min-height: 200px;
+  }
+}

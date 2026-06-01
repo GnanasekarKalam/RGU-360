@@ -1,0 +1,404 @@
+// prisma/migrations/faculty_student_master_modules.prisma
+// Faculty and Student Master Module Models
+// This file contains the schema for Faculty and Student management
+
+// ============================================================================
+// FACULTY MASTER MODULE - Extended Models
+// ============================================================================
+
+/// Faculty Qualification - Academic qualifications of faculty
+model FacultyQualification {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  degreeType            String      // B.Tech, M.Tech, PhD, etc.
+  specialization        String
+  university            String
+  yearOfPassing         Int
+  gradePercentage       Decimal?    @db.Decimal(5, 2)
+  certificateUrl        String?
+  isVerified            Boolean     @default(false)
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+}
+
+/// Faculty Publication - Research publications by faculty
+model FacultyPublication {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  title                 String
+  authors               String[]    // Array of author names
+  publicationType       PublicationType // Journal, Conference, Book, etc.
+  journalName           String?
+  journalVolume         String?
+  journalIssue          String?
+  pageNumbers           String?
+  publicationYear       Int
+  doi                   String?
+  impact               Decimal?    @db.Decimal(4, 3)
+  link                 String?
+  documentUrl          String?
+  citationCount        Int         @default(0)
+  isVerified           Boolean     @default(false)
+  verifiedBy           String?
+  verifiedAt           DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  // Relations
+  faculty              Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([publicationType])
+}
+
+enum PublicationType {
+  JOURNAL
+  CONFERENCE
+  BOOK
+  BOOK_CHAPTER
+  PATENT
+  TECHNICAL_REPORT
+}
+
+/// Faculty FDP - Faculty Development Program participation
+model FacultyFDP {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  programName           String
+  organizingInstitute   String
+  startDate             DateTime    @db.Date
+  endDate               DateTime    @db.Date
+  duration              Int         // In days
+  certificateUrl        String?
+  certificateNumber     String?
+  level                 FDPLevel    // Beginner, Intermediate, Advanced
+  fieldOfStudy          String
+  certificateIssued     Boolean     @default(false)
+  isVerified            Boolean     @default(false)
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([level])
+}
+
+enum FDPLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+/// Faculty Seminar - Seminar and workshop participation
+model FacultyS eminar {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  seminarTitle          String
+  organizingBody        String
+  venue                 String
+  startDate             DateTime    @db.Date
+  endDate               DateTime    @db.Date
+  role                  SeminarRole // Organizer, Speaker, Participant, etc.
+  description           String?
+  certificateUrl        String?
+  certificateNumber     String?
+  isVerified            Boolean     @default(false)
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([role])
+}
+
+enum SeminarRole {
+  ORGANIZER
+  SPEAKER
+  CHAIR
+  PARTICIPANT
+  INVITED_GUEST
+}
+
+/// Faculty PhD Tracking - PhD research and progress tracking
+model FacultyPhd {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  studentName           String
+  enrollmentNumber      String
+  researchTopic         String
+  supervisorName        String
+  coDoctorName          String?
+  enrollmentDate        DateTime    @db.Date
+  expectedCompletionDate DateTime   @db.Date
+  actualCompletionDate  DateTime?   @db.Date
+  status                PhdStatus   @default(ENROLLED)
+  progressPercentage    Int         @default(0)
+  preSubmissionDone     Boolean     @default(false)
+  viva1Date             DateTime?   @db.Date
+  viva2Date             DateTime?   @db.Date
+  finalThesisUrl        String?
+  isVerified            Boolean     @default(false)
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([status])
+}
+
+enum PhdStatus {
+  ENROLLED
+  PROGRESS
+  THESIS_SUBMITTED
+  VIVA_SCHEDULED
+  COMPLETED
+  WITHDRAWN
+}
+
+/// Faculty Skill - Skills and competencies
+model FacultySkill {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  skillName             String
+  skillCategory         String      // Technical, Soft, Language, etc.
+  proficiencyLevel      ProficiencyLevel
+  yearsOfExperience     Int?
+  certificateUrl        String?
+  endorsements          Int         @default(0)
+  lastUpdated           DateTime    @db.Date
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([skillCategory])
+}
+
+enum ProficiencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+  MASTER
+}
+
+/// Faculty Evidence - Supporting documentation for achievements
+model FacultyEvidence {
+  id                    String      @id @default(cuid())
+  facultyId             String
+  title                 String
+  description           String?
+  evidenceType          EvidenceType // Award, Patent, Research, etc.
+  documentUrl           String?
+  imageUrl              String?
+  issueDate             DateTime    @db.Date
+  expiryDate            DateTime?   @db.Date
+  verificationNumber    String?
+  issuingAuthority      String?
+  status                VerificationStatus @default(PENDING)
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  faculty               Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([evidenceType])
+  @@index([status])
+}
+
+enum EvidenceType {
+  AWARD
+  PATENT
+  RESEARCH_GRANT
+  CERTIFICATION
+  LICENSE
+  RECOGNITION
+  ACHIEVEMENT
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+// ============================================================================
+// STUDENT MASTER MODULE - Extended Models
+// ============================================================================
+
+/// Student Parent - Parent/Guardian information
+model StudentParent {
+  id                    String      @id @default(cuid())
+  studentId             String
+  parentName            String
+  relationship          ParentRelationship
+  email                 String?
+  phoneNumber           String?
+  mobileNumber          String?
+  profession            String?
+  organization          String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String?
+  aadharNumber          String?
+  panNumber             String?
+  isEmergencyContact    Boolean     @default(false)
+  isVerified            Boolean     @default(false)
+  verifiedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  student               Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+enum ParentRelationship {
+  FATHER
+  MOTHER
+  GUARDIAN
+  UNCLE
+  AUNT
+  GRAND_FATHER
+  GRAND_MOTHER
+}
+
+/// Student Academic Record - Detailed academic performance
+model StudentAcademicRecord {
+  id                    String      @id @default(cuid())
+  studentId             String
+  semester              String      // 1, 2, 3, etc.
+  academicYear          String      // 2023-24
+  semesterGpa           Decimal?    @db.Decimal(4, 3)
+  semesterCredits       Int
+  creditsEarned         Int
+  attemptedCredits      Int
+  totalCreditsEarned    Int
+  totalAttemptedCredits Int
+  cumulativeGpa         Decimal?    @db.Decimal(4, 3)
+  academicStanding      String      // Good, Warning, Probation
+  notes                 String?
+  recordVerifiedAt      DateTime?
+  recordVerifiedBy      String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  student               Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, semester, academicYear])
+  @@index([studentId])
+}
+
+/// Student Fee - Fee structure and payments
+model StudentFee {
+  id                    String      @id @default(cuid())
+  studentId             String
+  semester              String
+  academicYear          String
+  feeCategory           FeeCategory
+  totalFeeAmount        Decimal     @db.Decimal(10, 2)
+  dueDate               DateTime    @db.Date
+  paidAmount            Decimal     @db.Decimal(10, 2)
+  balance               Decimal     @db.Decimal(10, 2)
+  paymentStatus         PaymentStatus
+  lastPaymentDate       DateTime?
+  lastPaymentAmount     Decimal?    @db.Decimal(10, 2)
+  installments          Int         @default(1)
+  installmentsPaid      Int         @default(0)
+  remarks               String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  student               Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, semester, academicYear, feeCategory])
+  @@index([studentId])
+  @@index([paymentStatus])
+}
+
+enum FeeCategory {
+  TUITION
+  HOSTEL
+  TRANSPORTATION
+  ACTIVITY
+  LIBRARY
+  LABORATORY
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL_PAID
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+/// Student Tutor Ward - Tutor-ward assignment for mentoring
+model StudentTutorWard {
+  id                    String      @id @default(cuid())
+  studentId             String
+  tutorId               String
+  assignmentDate        DateTime    @db.Date
+  startDate             DateTime    @db.Date
+  endDate               DateTime?   @db.Date
+  status                TutorWardStatus @default(ACTIVE)
+  assignmentReason      String?
+  mentorshipPlan        String?
+  frequencyOfMeeting    Int?        // In days
+  lastMeetingDate       DateTime?
+  nextMeetingDate       DateTime?
+  performanceNotes      String?
+  isActive              Boolean     @default(true)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relations
+  student               Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tutor                 Faculty     @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([tutorId])
+  @@index([status])
+}
+
+enum TutorWardStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  TERMINATED
+  PAUSED
+}

@@ -1,0 +1,282 @@
+// ============================================================================
+// REPORTING ENGINE MODELS - Add these to schema.prisma
+// ============================================================================
+
+/// Report History - Tracks all generated reports
+model ReportHistory {
+  id                    String    @id @default(cuid())
+  reportType            ReportType
+  generatedByUserId     String
+  academicYear          String?
+  departmentId          String?
+  facultyId             String?
+  studentId             String?
+  
+  // Filter criteria used
+  filterCriteria        Json?     // JSON: {startDate, endDate, department, etc}
+  
+  // Generated file details
+  fileUrl               String?   // OneDrive or server URL
+  fileSize              BigInt?
+  fileName              String?
+  fileFormat            FileFormat @default(PDF)
+  
+  // Report metadata
+  totalRecords          Int       @default(0)
+  summaryData           Json?     // Key metrics/summary
+  compliancePercentage  Decimal?  @db.Decimal(5, 2)
+  
+  // Status & timestamps
+  generationStatus      GenerationStatus @default(GENERATED)
+  generatedAt           DateTime  @default(now())
+  expiresAt             DateTime? // For temporary reports
+  
+  // Approval & sharing
+  approvedByUserId      String?
+  approvedAt            DateTime?
+  isShared              Boolean   @default(false)
+  sharedWith            String[]  // Array of emails
+  
+  // Deletion
+  deletedAt             DateTime?
+  
+  // Relations
+  generatedBy           User      @relation("reportGeneratedBy", fields: [generatedByUserId], references: [id])
+  approvedBy            User?     @relation("reportApprovedBy", fields: [approvedByUserId], references: [id])
+  department            Department? @relation(fields: [departmentId], references: [id])
+  downloadLogs          DownloadLog[]
+
+  @@index([reportType])
+  @@index([generatedAt])
+  @@index([generatedByUserId])
+  @@index([departmentId])
+  @@index([generationStatus])
+}
+
+enum ReportType {
+  // Faculty Reports
+  FACULTY_MASTER
+  FACULTY_API_SCORE
+  FACULTY_PUBLICATION
+  FACULTY_FDP_SEMINAR
+  FACULTY_PHD_STATUS
+  FACULTY_TASK_COMPLETION
+  
+  // Student Reports
+  STUDENT_MASTER
+  STUDENT_PROGRESS
+  STUDENT_ATTENDANCE
+  STUDENT_FEE_PENDING
+  STUDENT_TUTOR_WARD
+  STUDENT_PARENT_INTERACTION
+  STUDENT_RISK_ASSESSMENT
+  
+  // Task Reports
+  TASK_DAILY
+  TASK_MONTHLY
+  TASK_OVERDUE
+  TASK_FACULTY_WISE
+  TASK_STUDENT_WISE
+  
+  // Accreditation Reports
+  ACCREDITATION_NBA
+  ACCREDITATION_NAAC
+  ACCREDITATION_UGC
+  ACCREDITATION_AICTE
+  ACCREDITATION_IQAC
+  ACCREDITATION_MISSING_EVIDENCE
+  
+  // Management Reports
+  MANAGEMENT_DEPARTMENT_PERFORMANCE
+  MANAGEMENT_FACULTY_SUMMARY
+  MANAGEMENT_STUDENT_SUMMARY
+  MANAGEMENT_RESEARCH_OUTPUT
+  MANAGEMENT_ACCREDITATION_READINESS
+}
+
+enum FileFormat {
+  PDF
+  EXCEL
+  WORD
+  PPT
+  CSV
+}
+
+enum GenerationStatus {
+  PENDING
+  GENERATING
+  GENERATED
+  FAILED
+  EXPIRED
+}
+
+/// Download Log - Audit trail for all report downloads
+model DownloadLog {
+  id                    String    @id @default(cuid())
+  reportHistoryId       String?
+  userId                String
+  reportType            ReportType
+  fileFormat            FileFormat
+  
+  // Download details
+  downloadedAt          DateTime  @default(now())
+  downloadStatus        String    @default("SUCCESS") // SUCCESS, FAILED
+  downloadError         String?
+  fileSize              BigInt?
+  downloadTime          Int?      // milliseconds
+  
+  // User context
+  ipAddress             String?
+  userAgent             String?
+  
+  // Data context
+  filterCriteria        Json?
+  
+  // Relations
+  reportHistory         ReportHistory? @relation(fields: [reportHistoryId], references: [id], onDelete: SetNull)
+  user                  User      @relation("downloadLogs", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([reportType])
+  @@index([downloadedAt])
+  @@index([reportHistoryId])
+}
+
+/// Report Template - Predefined report configurations
+model ReportTemplate {
+  id                    String    @id @default(cuid())
+  name                  String    @unique
+  reportType            ReportType @unique
+  description           String?
+  
+  // Configuration
+  includeCharts         Boolean   @default(true)
+  includeSignatures     Boolean   @default(false)
+  includeFooter         Boolean   @default(true)
+  logoUrl               String?
+  theme                 String?   // Default report theme
+  
+  // Data configuration
+  visibleColumns        String[]  // JSON of column names to show
+  defaultSort           String?
+  defaultFilters        Json?
+  
+  // Permission
+  requiredRole          String?   // ROLE_ADMIN, ROLE_HOD, etc
+  
+  // Timestamps
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+/// Scheduled Report - Recurring report generation
+model ScheduledReport {
+  id                    String    @id @default(cuid())
+  name                  String
+  reportType            ReportType
+  
+  // Schedule
+  frequency             ScheduleFrequency @default(MONTHLY)
+  dayOfMonth            Int?      // 1-31 for monthly
+  dayOfWeek             Int?      // 0-6 for weekly
+  time                  String?   // HH:MM
+  
+  // Recipients
+  recipientEmails       String[]
+  includeAttachment     Boolean   @default(true)
+  
+  // Filters
+  departmentId          String?
+  academicYear          String?
+  filterCriteria        Json?
+  
+  // Status
+  isActive              Boolean   @default(true)
+  lastRunAt             DateTime?
+  nextRunAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+/// Report Shared Link - Track shared report access
+model ReportShareLink {
+  id                    String    @id @default(cuid())
+  reportHistoryId       String
+  shareToken            String    @unique
+  
+  // Sharing options
+  expiresAt             DateTime?
+  password              String?   // Hashed password if protected
+  maxDownloads          Int?
+  downloadCount         Int       @default(0)
+  
+  // Metadata
+  sharedByUserId        String
+  sharedAt              DateTime  @default(now())
+  lastAccessedAt        DateTime?
+  
+  // Relations
+  reportHistory         ReportHistory @relation(fields: [reportHistoryId], references: [id], onDelete: Cascade)
+  sharedBy              User      @relation(fields: [sharedByUserId], references: [id])
+
+  @@index([shareToken])
+  @@index([reportHistoryId])
+}
+
+/// Faculty API Score - Detailed scoring breakdown for API calculation
+model FacultyAPIScore {
+  id                    String    @id @default(cuid())
+  facultyId             String    @unique
+  academicYear          String
+  
+  // Teaching (40 points)
+  teachingWorkloadScore Decimal   @db.Decimal(5, 2) @default(0)
+  studentFeedbackScore  Decimal   @db.Decimal(5, 2) @default(0)
+  
+  // Research (30 points)
+  researchPublicationScore Decimal @db.Decimal(5, 2) @default(0)
+  phdGuidanceScore      Decimal   @db.Decimal(5, 2) @default(0)
+  
+  // Development (20 points)
+  fdpParticipationScore Decimal   @db.Decimal(5, 2) @default(0)
+  skillDevelopmentScore Decimal   @db.Decimal(5, 2) @default(0)
+  
+  // Contribution (10 points)
+  taskCompletionScore   Decimal   @db.Decimal(5, 2) @default(0)
+  mentorshipScore       Decimal   @db.Decimal(5, 2) @default(0)
+  
+  // Final Score
+  totalAPIScore         Decimal   @db.Decimal(5, 2) @default(0)
+  apiCategory           String?   // Excellent, Very Good, Good, Average, Below Average
+  
+  // Timestamps
+  calculatedAt          DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  faculty               Faculty   @relation("apiScore", fields: [facultyId], references: [id])
+
+  @@unique([facultyId, academicYear])
+  @@index([academicYear])
+}
+
+// Add these fields to existing Faculty model:
+// apiScores               FacultyAPIScore[]  @relation("apiScore")
+// reportHistories         ReportHistory[]
+
+// Add these fields to existing User model:
+// reportHistoriesGenerated ReportHistory[]  @relation("reportGeneratedBy")
+// reportHistoriesApproved  ReportHistory[]  @relation("reportApprovedBy")
+// downloadLogs             DownloadLog[]
+// reportShareLinks         ReportShareLink[]
+
+// Add these fields to existing Department model:
+// reportHistories         ReportHistory[]

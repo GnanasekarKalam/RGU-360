@@ -1,0 +1,2098 @@
+// Academic Department360 Dashboard - Prisma Schema
+// Database: PostgreSQL
+// Generated for Academic Management System
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE MODELS
+// ============================================================================
+
+/// User model - Central user account for all system users
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  middleName            String?
+  dateOfBirth           DateTime?   @db.Date
+
+  // Contact Information
+  phoneNumber           String?
+  mobileNumber          String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String?
+
+  // Account Status
+  status                UserStatus  @default(ACTIVE)
+  isMfaEnabled          Boolean     @default(false)
+  mfaMethod             MfaMethod?  @default(TOTP)
+
+  // Timestamps
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  lastLoginAt           DateTime?
+  passwordChangedAt     DateTime?
+  deletedAt             DateTime?
+
+  // Relations
+  roles                 UserRole[]
+  faculties             Faculty[]   @relation("user")
+  students              Student[]   @relation("user")
+  adminOperations       AdminOperation[]
+  workflowsInitiated    Workflow[]  @relation("initiated")
+  workflowsCompleted    Workflow[]  @relation("completed")
+  approvalsPending      WorkflowApproval[] @relation("assigned")
+  approvalsReassigned   WorkflowApproval[] @relation("reassigned")
+  approvalsEscalated    WorkflowApproval[] @relation("escalated")
+  auditLogs             AuditLog[]
+  
+  // Grade Relations - using Faculty model instead
+  enrollmentCreated     Enrollment[] @relation("createdBy")
+  enrollmentModified    Enrollment[] @relation("modifiedBy")
+  
+  // Task Management Relations
+  assignedTasks         TaskAssignment[] @relation("assignedTasks")
+  groupMembers          TaskGroupMember[] @relation("groupMembers")
+  submittedEvidence     TaskEvidence[] @relation("submittedEvidence")
+  verifiedEvidence      TaskEvidence[] @relation("verifiedEvidence")
+  taskComments          TaskComment[] @relation("taskComments")
+  notifications         TaskNotification[] @relation("notifications")
+  escalatedTasks        TaskEscalation[] @relation("escalatedTasks")
+  receivedEscalations   TaskEscalation[] @relation("receivedEscalations")
+  approvingTasks        TaskApproval[] @relation("approvingTasks")
+  escalationLevel1      TaskEscalationMatrix[] @relation("escalationLevel1")
+  escalationLevel2      TaskEscalationMatrix[] @relation("escalationLevel2")
+  escalationLevel3      TaskEscalationMatrix[] @relation("escalationLevel3")
+  
+  // Accreditation Relations
+  assignedRoles         UserRole[]  @relation("assignedRoles")
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MfaMethod {
+  TOTP
+  SMS
+  EMAIL
+  AUTHENTICATOR
+}
+
+/// User Roles - Links users to roles with optional department scope
+model UserRole {
+  id              String    @id @default(cuid())
+  userId          String
+  roleId          String
+  departmentId    String?
+  assignedById    String?
+  assignedAt      DateTime  @default(now())
+  expiresAt       DateTime?
+  isPrimary       Boolean   @default(false)
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            Role      @relation(fields: [roleId], references: [id])
+  department      Department? @relation(fields: [departmentId], references: [id])
+  assignedBy      User?     @relation("assignedRoles", fields: [assignedById], references: [id])
+
+  @@unique([userId, roleId, departmentId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([departmentId])
+}
+
+// ============================================================================
+// FACULTY & STUDENT MODELS
+// ============================================================================
+
+/// Faculty model - Extended information for faculty members
+model Faculty {
+  id                      String      @id @default(cuid())
+  userId                  String      @unique
+  departmentId            String
+  employeeId              String      @unique
+  title                   String?
+  specialization          String?
+  academicDegree          String?
+  degreeInstitution       String?
+
+  // Employment
+  employmentStatus        EmploymentStatus @default(FULL_TIME)
+  hireDate                DateTime?   @db.Date
+  tenureStatus            TenureStatus @default(NON_TENURE_TRACK)
+  tenureDate              DateTime?   @db.Date
+
+  // Office Information
+  officeLocation          String?
+  officePhone             String?
+  officeHours             String?     // JSON formatted
+
+  // Performance
+  performanceRating       Decimal?    @db.Decimal(3, 2)
+  teachingEffectivenessScore Decimal? @db.Decimal(3, 2)
+  lastEvaluationDate      DateTime?   @db.Date
+
+  // Financial (Encrypted)
+  salaryAmount            Decimal?    @db.Decimal(10, 2)
+  salaryCurrency          String?     @default("USD")
+
+  // Status
+  isActive                Boolean     @default(true)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  user                    User        @relation("user", fields: [userId], references: [id], onDelete: Restrict)
+  department              Department  @relation(fields: [departmentId], references: [id])
+  classes                 Class[]
+  gradeSubmitted          Grade[]     @relation("submittedByFaculty")
+  gradeApproved           Grade[]     @relation("approvedByFaculty")
+  advisedStudents         Student[]
+  gradeAppealsFaculty     GradeAppeal[] @relation("facultyReviewerFaculty")
+  gradeAppealsDept        GradeAppeal[] @relation("deptReviewerFaculty")
+  departmentHeadOf        Department? @relation("head")
+  
+  // Faculty Master Details
+  qualifications          FacultyQualification[]
+  publications            FacultyPublication[]
+  fdpPrograms             FacultyFDP[]
+  seminars                FacultySeminar[]
+  phdCandidates           FacultyPhd[]
+  skills                  FacultySkill[]
+  evidenceItems           FacultyEvidence[]
+  
+  // Tutoring
+  tutorWards              StudentTutorWard[]  @relation("tutorWards")
+  
+  // Accreditation Relations
+  accreditationMappings   AccreditationCriteriaMapping[] @relation("accreditationMappingFaculty")
+  accreditationFacultyMap AccreditationFacultyMapping[]  @relation("accreditationFacultyMap")
+
+  @@index([departmentId])
+  @@index([employmentStatus])
+  @@index([isActive])
+}
+
+enum EmploymentStatus {
+  FULL_TIME
+  PART_TIME
+  ADJUNCT
+  VISITING
+}
+
+enum TenureStatus {
+  TENURED
+  TENURE_TRACK
+  NON_TENURE_TRACK
+}
+
+/// Student model - Extended information for students
+model Student {
+  id                      String      @id @default(cuid())
+  userId                  String      @unique
+  studentId               String      @unique
+  degreeProgram           String      // Program ID or name
+  majorId                 String
+  minorId                 String?
+  concentrationId         String?
+
+  // Enrollment Status
+  enrollmentStatus        EnrollmentStatus @default(ENROLLED)
+  enrollmentDate          DateTime    @db.Date
+  expectedGraduationDate  DateTime?   @db.Date
+  graduationDate          DateTime?   @db.Date
+
+  // Academic Standing
+  currentGpa              Decimal?    @db.Decimal(4, 3)
+  cumulativeGpa           Decimal?    @db.Decimal(4, 3)
+  academicStanding        AcademicStanding @default(GOOD)
+  creditsEarned           Int         @default(0)
+  creditsRequired         Int?
+
+  // Contact Information
+  permanentAddressId      String?
+  currentAddressId        String?
+  emergencyContactName    String?
+  emergencyContactPhone   String?
+  emergencyContactRelation String?
+
+  // Financial Hold
+  hasFinancialHold        Boolean     @default(false)
+
+  // Advisor
+  primaryAdvisorId        String?
+
+  // Timestamps
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  user                    User        @relation("user", fields: [userId], references: [id], onDelete: Restrict)
+  primaryAdvisor          Faculty?    @relation(fields: [primaryAdvisorId], references: [id])
+  enrollments             Enrollment[]
+  grades                  Grade[]
+  gradeAppeals            GradeAppeal[]
+  
+  // Student Master Details
+  parents                 StudentParent[]
+  academicRecords         StudentAcademicRecord[]
+  fees                    StudentFee[]
+  tutorWards              StudentTutorWard[]
+  
+  // Accreditation Relations
+  accreditationMappings   AccreditationCriteriaMapping[] @relation("accreditationMappingStudent")
+  accreditationStudentMap AccreditationStudentMapping[]  @relation("accreditationStudentMap")
+
+  @@index([enrollmentStatus])
+  @@index([academicStanding])
+  @@index([primaryAdvisorId])
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  LEAVE_OF_ABSENCE
+  GRADUATED
+  WITHDRAWN
+  SUSPENDED
+}
+
+enum AcademicStanding {
+  GOOD
+  WARNING
+  PROBATION
+  SUSPENSION
+}
+
+/// Admin Operation - Administrative staff assignments
+model AdminOperation {
+  id                String    @id @default(cuid())
+  userId            String
+  departmentId      String?
+  operationScope    String?   // JSON formatted
+  startDate         DateTime  @default(now())
+  endDate           DateTime?
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================================
+// ACADEMIC STRUCTURE MODELS
+// ============================================================================
+
+/// Department model - Academic departments
+model Department {
+  id                      String      @id @default(cuid())
+  code                    String      @unique
+  name                    String      @unique
+  fullName                String?
+  description             String?
+
+  // Leadership
+  departmentHeadId        String?     @unique
+  phone                   String?
+  email                   String?
+  officeLocation          String?
+
+  // Configuration
+  isActive                Boolean     @default(true)
+  budgetAllocation        Decimal?    @db.Decimal(12, 2)
+  academicCalendarId      String?
+
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  departmentHead          Faculty?    @relation("head", fields: [departmentHeadId], references: [id], onDelete: SetNull)
+  faculty                 Faculty[]
+  programs                Program[]
+  courses                 Course[]
+  userRoles               UserRole[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+/// Program model - Degree programs
+model Program {
+  id                      String      @id @default(cuid())
+  departmentId            String
+  code                    String
+  name                    String
+  degreeType              DegreeType  @default(BACHELOR)
+  description             String?
+
+  // Academic Requirements
+  totalCreditsRequired    Int?
+  minimumGpa              Decimal     @db.Decimal(3, 2) @default(2.0)
+
+  // Accreditation
+  accreditationStatus     String?
+  accreditationBody       String?
+  accreditationExpiry     DateTime?   @db.Date
+
+  // Status
+  isActive                Boolean     @default(true)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  department              Department  @relation(fields: [departmentId], references: [id])
+  courses                 CourseProgram[]
+
+  @@unique([departmentId, code])
+  @@index([isActive])
+}
+
+enum DegreeType {
+  BACHELOR
+  MASTER
+  PHD
+  CERTIFICATE
+}
+
+/// Course model - Course definitions
+model Course {
+  id                      String      @id @default(cuid())
+  departmentId            String
+  courseCode              String
+  courseNumber            Int
+  title                   String
+  description             String?
+
+  // Academic Details
+  creditHours             Int         @default(3)
+  contactHours            Int?
+  labHours                Int?
+  isLabCourse             Boolean     @default(false)
+
+  // Prerequisites
+  prerequisiteCourseId    String?
+  prerequisiteGradeRequired String?
+  corequisiteCourseId     String?
+
+  // Curriculum
+  isGeneralEducation      Boolean     @default(false)
+
+  // Learning Outcomes & Assessment
+  learningOutcomes        String?     // JSON format
+  assessmentMethods       String?     // JSON format
+
+  // Enrollment
+  maxEnrollment           Int         @default(40)
+  minEnrollment           Int         @default(10)
+
+  // Status
+  isActive                Boolean     @default(true)
+  isOnline                Boolean     @default(false)
+
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  department              Department  @relation(fields: [departmentId], references: [id])
+  prerequisiteCourse      Course?     @relation("prerequisite", fields: [prerequisiteCourseId], references: [id])
+  prerequisiteFor         Course[]    @relation("prerequisite")
+  corequisiteCourse       Course?     @relation("corequisite", fields: [corequisiteCourseId], references: [id])
+  corequisiteFor          Course[]    @relation("corequisite")
+  programs                CourseProgram[]
+  classes                 Class[]
+
+  @@unique([departmentId, courseCode])
+  @@index([isActive])
+  @@index([prerequisiteCourseId])
+}
+
+model CourseProgram {
+  id          String    @id @default(cuid())
+  courseId    String
+  programId   String
+  isRequired  Boolean   @default(true)
+  sequenceOrder Int?
+
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, programId])
+}
+
+/// Class model - Course section instances
+model Class {
+  id                      String      @id @default(cuid())
+  courseId                String
+  instructorId            String
+  semesterId              String
+
+  // Schedule
+  sectionNumber           Int         @default(1)
+  dayOfWeek               String?     // Monday, Tuesday, etc.
+  startTime               DateTime?   @db.Time
+  endTime                 DateTime?   @db.Time
+  location                String?     // Building and room
+
+  // Capacity
+  enrollmentCapacity      Int
+  currentEnrollment       Int         @default(0)
+  waitlistCount           Int         @default(0)
+
+  // Mode
+  deliveryMode            DeliveryMode @default(IN_PERSON)
+
+  // Grading
+  gradingSchemeId         String?
+
+  // Status
+  isActive                Boolean     @default(true)
+  isFull                  Boolean     @default(false)
+
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  course                  Course      @relation(fields: [courseId], references: [id])
+  instructor              Faculty     @relation(fields: [instructorId], references: [id])
+  semester                Semester    @relation(fields: [semesterId], references: [id])
+  enrollments             Enrollment[]
+  grades                  Grade[]
+
+  @@unique([courseId, semesterId, sectionNumber])
+  @@index([instructorId])
+  @@index([semesterId])
+}
+
+enum DeliveryMode {
+  IN_PERSON
+  ONLINE
+  HYBRID
+}
+
+/// Enrollment model - Student course enrollments
+model Enrollment {
+  id                      String      @id @default(cuid())
+  studentId               String
+  classId                 String
+  semesterId              String
+
+  // Status
+  enrollmentStatus        EnrollmentStatusEnum @default(ENROLLED)
+  enrollmentDate          DateTime    @default(now())
+  dropDate                DateTime?
+
+  // Grade
+  gradeId                 String?
+  gradeLetter             String?
+  gradePoints             Decimal?    @db.Decimal(3, 2)
+  isGradeFinal            Boolean     @default(false)
+  gradePostedDate         DateTime?
+
+  // Attendance
+  attendanceCount         Int         @default(0)
+  absenceCount            Int         @default(0)
+
+  // Transcript
+  includeInGpa            Boolean     @default(true)
+  transcriptStatus        TranscriptStatus @default(PENDING)
+
+  // Audit Trail
+  createdById             String?
+  modifiedById            String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id])
+  class                   Class       @relation(fields: [classId], references: [id])
+  semester                Semester    @relation(fields: [semesterId], references: [id])
+  grade                   Grade?
+  createdBy               User?       @relation("createdBy", fields: [createdById], references: [id])
+  modifiedBy              User?       @relation("modifiedBy", fields: [modifiedById], references: [id])
+
+  @@unique([studentId, classId, semesterId])
+  @@index([enrollmentStatus])
+  @@index([semesterId])
+}
+
+enum EnrollmentStatusEnum {
+  ENROLLED
+  WAITLISTED
+  DROPPED
+  AUDIT
+}
+
+enum TranscriptStatus {
+  PENDING
+  POSTED
+  HELD
+}
+
+// ============================================================================
+// GRADING MODELS
+// ============================================================================
+
+/// Grade model - Student grades
+model Grade {
+  id                      String      @id @default(cuid())
+  enrollmentId            String
+  classId                 String
+  studentId               String
+
+  // Grade Information
+  gradeNumeric            Decimal?    @db.Decimal(5, 2)
+  gradeLetter             String?
+  gradePoints             Decimal?    @db.Decimal(3, 2)
+
+  // Grading Components
+  participationScore      Decimal?    @db.Decimal(5, 2)
+  attendanceScore         Decimal?    @db.Decimal(5, 2)
+  assignmentScore         Decimal?    @db.Decimal(5, 2)
+  midtermScore            Decimal?    @db.Decimal(5, 2)
+  finalExamScore          Decimal?    @db.Decimal(5, 2)
+  projectScore            Decimal?    @db.Decimal(5, 2)
+
+  // Status
+  isDraft                 Boolean     @default(true)
+  isApproved              Boolean     @default(false)
+  isFinal                 Boolean     @default(false)
+
+  // Submission & Approval
+  submittedById           String?
+  submittedAt             DateTime?
+  approvedById            String?
+  approvedAt              DateTime?
+
+  // Comments
+  facultyComments         String?
+  studentComments         String?
+
+  // Audit
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  enrollment              Enrollment  @relation(fields: [enrollmentId], references: [id])
+  class                   Class       @relation(fields: [classId], references: [id])
+  student                 Student     @relation(fields: [studentId], references: [id])
+  
+  @@unique([enrollmentId])
+  submittedBy             Faculty?    @relation("submittedByFaculty", fields: [submittedById], references: [id])
+  approvedBy              Faculty?    @relation("approvedByFaculty", fields: [approvedById], references: [id])
+  gradeAppeal             GradeAppeal[] @relation("originalGrade")
+  outcomeGradeAppeal      GradeAppeal[] @relation("outcomeGrade")
+
+  @@index([studentId])
+  @@index([enrollmentId])
+  @@index([isApproved])
+  @@index([submittedAt])
+}
+
+/// Grade Appeal model - Student grade appeal process
+model GradeAppeal {
+  id                      String      @id @default(cuid())
+  enrollmentId            String
+  studentId               String
+  gradeId                 String
+
+  // Appeal Details
+  appealReason            String
+  appealDate              DateTime    @default(now())
+
+  // Status
+  appealStatus            AppealStatus @default(SUBMITTED)
+
+  // Faculty Response
+  facultyResponse         String?
+  facultyResponseDate     DateTime?
+  facultyReviewerId       String?
+
+  // Department Head Review
+  departmentReviewNotes   String?
+  departmentReviewerId    String?
+  departmentReviewDate    DateTime?
+
+  // Outcome
+  outcomeGradeId          String?
+  resolutionDate          DateTime?
+
+  // Audit
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  grade                   Grade       @relation("originalGrade", fields: [gradeId], references: [id])
+  facultyReviewer         Faculty?    @relation("facultyReviewerFaculty", fields: [facultyReviewerId], references: [id])
+  departmentReviewer      Faculty?    @relation("deptReviewerFaculty", fields: [departmentReviewerId], references: [id])
+  outcomeGrade            Grade?      @relation("outcomeGrade", fields: [outcomeGradeId], references: [id])
+
+  @@index([studentId])
+  @@index([appealStatus])
+  @@index([appealDate])
+}
+
+enum AppealStatus {
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  DENIED
+  ESCALATED
+}
+
+// ============================================================================
+// WORKFLOW & APPROVAL MODELS
+// ============================================================================
+
+/// Workflow model - Base workflow tracking
+model Workflow {
+  id                      String      @id @default(cuid())
+  workflowType            WorkflowType
+  status                  WorkflowStatus @default(DRAFT)
+
+  // Related Resource
+  relatedResourceType     String?
+  relatedResourceId       String?
+
+  // Initiator
+  initiatedById           String
+  initiatedAt             DateTime    @default(now())
+
+  // Completion
+  completedById           String?
+  completedAt             DateTime?
+
+  // Metadata
+  data                    Json?       // Flexible workflow-specific data
+  comments                String?
+
+  // Timeline
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  initiatedBy             User        @relation("initiated", fields: [initiatedById], references: [id])
+  completedBy             User?       @relation("completed", fields: [completedById], references: [id])
+  approvals               WorkflowApproval[]
+
+  @@index([workflowType])
+  @@index([status])
+  @@index([initiatedAt])
+}
+
+enum WorkflowType {
+  GRADE_SUBMISSION
+  COURSE_ADDITION
+  GRADE_APPEAL
+  LEAVE_REQUEST
+  CURRICULUM_CHANGE
+  ACADEMIC_STANDING_CHANGE
+}
+
+enum WorkflowStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+/// WorkflowApproval model - Individual approval steps in workflow
+model WorkflowApproval {
+  id                      String      @id @default(cuid())
+  workflowId              String
+  approvalLevel           Int
+
+  // Approver
+  assignedToId            String
+  assignedAt              DateTime    @default(now())
+
+  // Status
+  approvalStatus          ApprovalStatus @default(PENDING)
+
+  // Response
+  responseDate            DateTime?
+  comments                String?
+
+  // Reassignment
+  reassignedToId          String?
+  reassignmentReason      String?
+  reassignmentDate        DateTime?
+
+  // Escalation
+  escalationReason        String?
+  escalatedToId           String?
+  escalationDate          DateTime?
+  escalationLevel         Int?
+
+  // Timeline
+  dueDate                 DateTime?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  workflow                Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  assignedTo              User        @relation("assigned", fields: [assignedToId], references: [id])
+  reassignedTo            User?       @relation("reassigned", fields: [reassignedToId], references: [id])
+  escalatedTo             User?       @relation("escalated", fields: [escalatedToId], references: [id])
+
+  @@unique([workflowId, approvalLevel])
+  @@index([assignedToId])
+  @@index([approvalStatus])
+  @@index([dueDate])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  REASSIGNED
+}
+
+// ============================================================================
+// AUDIT & LOGGING MODELS
+// ============================================================================
+
+/// AuditLog model - Comprehensive audit trail for FERPA compliance
+model AuditLog {
+  id                      String      @id @default(cuid())
+  userId                  String?
+  action                  String
+  resourceType            String?
+  resourceId              String?
+
+  // Change Details
+  oldValues               Json?
+  newValues               Json?
+
+  // Request Details
+  ipAddress               String?
+  userAgent               String?
+
+  // Status
+  status                  String?
+  errorMessage            String?
+
+  // FERPA Tracking
+  ferpaProtected          Boolean     @default(false)
+  studentId               String?
+
+  // Severity
+  severity                Severity    @default(INFO)
+
+  // Retention
+  retentionUntil          DateTime?   @db.Date
+
+  // Timestamp
+  createdAt               DateTime    @default(now())
+
+  // Relations
+  user                    User?       @relation(fields: [userId], references: [id])
+  // student removed - Student doesn't have back-relation
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+  @@index([ferpaProtected])
+  @@index([severity])
+}
+
+enum Severity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ============================================================================
+// REFERENCE/LOOKUP MODELS
+// ============================================================================
+
+/// Semester model - Academic terms/semesters
+model Semester {
+  id                      String      @id @default(cuid())
+  code                    String      @unique
+  name                    String
+  academicYear            Int
+  season                  Season
+
+  startDate               DateTime    @db.Date
+  endDate                 DateTime    @db.Date
+  registrationStart       DateTime?   @db.Date
+  registrationEnd         DateTime?   @db.Date
+  addDropDeadline         DateTime?   @db.Date
+  withdrawalDeadline      DateTime?   @db.Date
+  gradesDueDate           DateTime?   @db.Date
+
+  isActive                Boolean     @default(false)
+  createdAt               DateTime    @default(now())
+
+  // Relations
+  classes                 Class[]
+  enrollments             Enrollment[]
+
+  @@index([academicYear])
+  @@index([isActive])
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  FALL
+  WINTER
+}
+
+/// Role model - System and custom roles
+model Role {
+  id                      String      @id @default(cuid())
+  name                    String      @unique
+  description             String?
+  isSystemRole            Boolean     @default(false)
+  isActive                Boolean     @default(true)
+
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  userRoles               UserRole[]
+  permissions             RolePermission[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+/// Permission model - System permissions
+model Permission {
+  id                      String      @id @default(cuid())
+  name                    String      @unique
+  description             String?
+  resource                String?
+  action                  String?
+
+  createdAt               DateTime    @default(now())
+
+  // Relations
+  roles                   RolePermission[]
+
+  @@unique([resource, action])
+}
+
+/// RolePermission model - Maps permissions to roles
+model RolePermission {
+  id                      String      @id @default(cuid())
+  roleId                  String
+  permissionId            String
+
+  createdAt               DateTime    @default(now())
+
+  // Relations
+  role                    Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission              Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+// ============================================================================
+// ACCREDITATION & EVIDENCE MODELS
+// ============================================================================
+
+/// Accreditation model - Program accreditation tracking
+model Accreditation {
+  id                      String      @id @default(cuid())
+  programId               String
+  accreditationBody       String
+  status                  AccreditationStatus @default(PENDING)
+  
+  expiryDate              DateTime    @db.Date
+  lastReviewDate          DateTime?   @db.Date
+  nextReviewDate          DateTime?   @db.Date
+  
+  documentUrl             String?
+  reviewNotes             String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  evidenceItems           AccreditationEvidence[]
+
+  @@index([status])
+  @@index([expiryDate])
+}
+
+enum AccreditationStatus {
+  PENDING
+  ACTIVE
+  WARNING
+  EXPIRED
+  UNDER_REVIEW
+}
+
+/// AccreditationEvidence model - Evidence for accreditation
+model AccreditationEvidence {
+  id                      String      @id @default(cuid())
+  accreditationId         String
+  evidenceType            String
+  description             String?
+  
+  fileUrl                 String
+  fileSize                Int?
+  uploadedAt              DateTime    @default(now())
+  
+  status                  EvidenceStatus @default(PENDING_REVIEW)
+  reviewedBy              String?
+  reviewDate              DateTime?
+  reviewNotes             String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  accreditation           Accreditation @relation(fields: [accreditationId], references: [id], onDelete: Cascade)
+
+  @@index([accreditationId])
+  @@index([status])
+}
+
+enum EvidenceStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+// ============================================================================
+// TASK MANAGEMENT MODELS
+// ============================================================================
+
+/// Task model - General task tracking
+model Task {
+  id                      String      @id @default(cuid())
+  title                   String
+  description             String?
+  
+  taskType                TaskType
+  status                  TaskStatus  @default(TODO)
+  priority                Priority    @default(MEDIUM)
+  
+  assignedToId            String?
+  createdById             String
+  
+  dueDate                 DateTime?
+  startDate               DateTime?
+  completedDate           DateTime?
+  
+  // Links to system resources
+  relatedResourceType     String?
+  relatedResourceId       String?
+  
+  // Task metadata
+  tags                    String[]    @default([])
+  attachments             String[]    @default([])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([dueDate])
+}
+
+enum TaskType {
+  ADMINISTRATIVE
+  GRADING
+  REVIEW
+  APPROVAL
+  CURRICULUM
+  OTHER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============================================================================
+// DOCUMENT & FILE MODELS
+// ============================================================================
+
+/// Document model - Uploaded documents and files
+model Document {
+  id                      String      @id @default(cuid())
+  title                   String
+  description             String?
+  
+  fileUrl                 String
+  fileSize                Int
+  mimeType                String
+  
+  uploadedById            String
+  uploadedAt              DateTime    @default(now())
+  
+  // Document categorization
+  documentType            String?
+  category                String?
+  
+  // OneDrive integration
+  oneDriveId              String?
+  oneDrivePath            String?
+  lastSyncedAt            DateTime?
+  
+  // Retention
+  retentionUntil          DateTime?   @db.Date
+  isArchived              Boolean     @default(false)
+  
+  // Metadata
+  tags                    String[]    @default([])
+  metadata                Json?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  @@index([documentType])
+  @@index([category])
+  @@index([uploadedById])
+  @@index([uploadedAt])
+}
+
+// ============================================================================
+// FACULTY MASTER DETAILED MODELS
+// ============================================================================
+
+/// FacultyQualification model - Faculty educational qualifications
+model FacultyQualification {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  degreeType              String      // Bachelor, Master, PhD, Diploma, etc.
+  specialization          String
+  university              String
+  yearOfPassing           Int
+  gradePercentage         Decimal?    @db.Decimal(5, 2)
+  certificateUrl          String?
+  certificateNumber       String?
+  
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([isVerified])
+}
+
+/// FacultyPublication model - Faculty research publications
+model FacultyPublication {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  title                   String
+  authors                 String[]    @default([])
+  publicationType         String      // JOURNAL, CONFERENCE, BOOK, BOOK_CHAPTER, PATENT, TECHNICAL_REPORT
+  journalName             String?
+  journalVolume           String?
+  journalIssue            String?
+  pageNumbers             String?
+  publicationYear         Int
+  
+  doi                     String?
+  issn                    String?
+  impact                  Decimal?    @db.Decimal(5, 3)
+  link                    String?
+  documentUrl             String?
+  
+  citationCount           Int         @default(0)
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([publicationYear])
+  @@index([publicationType])
+  @@index([isVerified])
+}
+
+/// FacultyFDP model - Faculty Development Programs
+model FacultyFDP {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  programName             String
+  organizingInstitute     String
+  startDate               DateTime    @db.Date
+  endDate                 DateTime    @db.Date
+  duration                Int         // In days
+  
+  certificateUrl          String?
+  certificateNumber       String?
+  level                   String      // BEGINNER, INTERMEDIATE, ADVANCED, EXPERT
+  fieldOfStudy            String
+  certificateIssued       Boolean     @default(false)
+  
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([startDate])
+  @@index([level])
+  @@index([isVerified])
+}
+
+/// FacultySeminar model - Faculty seminar and conference participation
+model FacultySeminar {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  seminarTitle            String
+  organizingBody          String
+  venue                   String
+  city                    String?
+  country                 String?
+  startDate               DateTime    @db.Date
+  endDate                 DateTime    @db.Date
+  
+  role                    String      // ORGANIZER, SPEAKER, CHAIR, PARTICIPANT, INVITED_GUEST
+  description             String?
+  
+  certificateUrl          String?
+  certificateNumber       String?
+  certificateIssued       Boolean     @default(false)
+  
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([startDate])
+  @@index([role])
+  @@index([isVerified])
+}
+
+/// FacultyPhd model - PhD supervision tracking
+model FacultyPhd {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  studentName             String
+  enrollmentNumber        String      @unique
+  researchTopic           String
+  supervisorName          String
+  coDoctorName            String?
+  
+  enrollmentDate          DateTime    @db.Date
+  expectedCompletionDate  DateTime    @db.Date
+  actualCompletionDate    DateTime?   @db.Date
+  
+  status                  String      @default("ENROLLED") // ENROLLED, PROGRESS, THESIS_SUBMITTED, VIVA_SCHEDULED, COMPLETED, WITHDRAWN
+  progressPercentage      Int         @default(0)
+  
+  preSubmissionDone       Boolean     @default(false)
+  viva1Date               DateTime?   @db.Date
+  viva1Result             String?     // PASS, FAIL, POSTPONED
+  viva2Date               DateTime?   @db.Date
+  viva2Result             String?
+  
+  finalThesisUrl          String?
+  thesisTitle             String?
+  
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([status])
+  @@index([enrollmentDate])
+  @@index([isVerified])
+}
+
+/// FacultySkill model - Faculty professional skills
+model FacultySkill {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  skillName               String
+  skillCategory           String      // Technical, Research, Teaching, Management, etc.
+  proficiencyLevel        String      // BEGINNER, INTERMEDIATE, ADVANCED, EXPERT, MASTER
+  
+  yearsOfExperience       Int?
+  certificateUrl          String?
+  certificateIssued       Boolean     @default(false)
+  
+  endorsements            Int         @default(0)
+  lastEndorsedAt          DateTime?
+  
+  lastUpdated             DateTime    @default(now())
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@unique([facultyId, skillName, skillCategory])
+  @@index([facultyId])
+  @@index([skillCategory])
+  @@index([proficiencyLevel])
+}
+
+/// FacultyEvidence model - Faculty achievements and evidence
+model FacultyEvidence {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  title                   String
+  description             String?
+  evidenceType            String      // AWARD, PATENT, RESEARCH_GRANT, CERTIFICATION, LICENSE, RECOGNITION, ACHIEVEMENT, OTHER
+  
+  documentUrl             String?
+  imageUrl                String?
+  
+  issueDate               DateTime    @db.Date
+  expiryDate              DateTime?   @db.Date
+  verificationNumber      String?
+  issuingAuthority        String?
+  
+  status                  String      @default("PENDING") // PENDING, VERIFIED, REJECTED, EXPIRED
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  rejectionReason         String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  faculty                 Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+  @@index([evidenceType])
+  @@index([status])
+  @@index([issueDate])
+  @@index([verifiedAt])
+}
+
+// Update Faculty model to include relations to new models
+// (This is implicit in Prisma - just need to add these fields to Faculty model)
+
+// ============================================================================
+// STUDENT MASTER DETAILED MODELS
+// ============================================================================
+
+/// StudentParent model - Student parent/guardian details
+model StudentParent {
+  id                      String      @id @default(cuid())
+  studentId               String
+  parentName              String
+  relationship            String      // FATHER, MOTHER, GUARDIAN, UNCLE, AUNT, GRAND_FATHER, GRAND_MOTHER
+  
+  email                   String?
+  phoneNumber             String?
+  mobileNumber            String?
+  
+  profession              String?
+  organization            String?
+  
+  addressLine1            String?
+  addressLine2            String?
+  city                    String?
+  state                   String?
+  zipCode                 String?
+  country                 String?
+  
+  // Document Details
+  aadharNumber            String?
+  panNumber               String?
+  gstNumber               String?
+  
+  isEmergencyContact      Boolean     @default(false)
+  isVerified              Boolean     @default(false)
+  verifiedAt              DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([relationship])
+  @@index([isEmergencyContact])
+}
+
+/// StudentAcademicRecord model - Semester-wise academic performance
+model StudentAcademicRecord {
+  id                      String      @id @default(cuid())
+  studentId               String
+  semester                String      // 1, 2, 3, 4, 5, 6, 7, 8, etc.
+  academicYear            String      // 2023-24, 2024-25, etc.
+  
+  semesterGpa             Decimal?    @db.Decimal(4, 3)
+  semesterCredits         Int
+  creditsEarned           Int
+  attemptedCredits        Int
+  
+  totalCreditsEarned      Int
+  totalAttemptedCredits   Int
+  cumulativeGpa           Decimal?    @db.Decimal(4, 3)
+  
+  academicStanding        String      @default("GOOD") // GOOD, WARNING, PROBATION, SUSPENSION
+  
+  notes                   String?
+  
+  recordVerifiedBy        String?
+  recordVerifiedAt        DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, semester, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+  @@index([academicStanding])
+}
+
+/// StudentFee model - Fee structure and payment tracking
+model StudentFee {
+  id                      String      @id @default(cuid())
+  studentId               String
+  semester                String
+  academicYear            String
+  
+  feeCategory             String      // TUITION, HOSTEL, TRANSPORTATION, ACTIVITY, LIBRARY, LABORATORY, OTHER
+  feeDescription          String?
+  
+  totalFeeAmount          Decimal     @db.Decimal(10, 2)
+  dueDate                 DateTime    @db.Date
+  
+  paidAmount              Decimal     @db.Decimal(10, 2) @default(0)
+  balance                 Decimal     @db.Decimal(10, 2)
+  
+  paymentStatus           String      @default("PENDING") // PENDING, PARTIAL_PAID, PAID, OVERDUE, WAIVED, EXEMPTED
+  lastPaymentDate         DateTime?
+  lastPaymentAmount       Decimal?    @db.Decimal(10, 2)
+  
+  installments            Int         @default(1)
+  installmentsPaid        Int         @default(0)
+  
+  remarks                 String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments                StudentFeePayment[]
+
+  @@index([studentId])
+  @@index([semester])
+  @@index([academicYear])
+  @@index([feeCategory])
+  @@index([paymentStatus])
+  @@index([dueDate])
+}
+
+/// StudentFeePayment model - Individual fee payment records
+model StudentFeePayment {
+  id                      String      @id @default(cuid())
+  studentFeeId            String
+  
+  paymentAmount           Decimal     @db.Decimal(10, 2)
+  paymentDate             DateTime
+  
+  transactionId           String?
+  paymentMethod           String?     // CASH, CHEQUE, BANK_TRANSFER, CREDIT_CARD, ONLINE
+  
+  bankDetails             String?     // Bank name, branch, etc.
+  chequeNumber            String?
+  chequeDate              DateTime?   @db.Date
+  
+  receiptNumber           String?
+  receiptUrl              String?
+  
+  remarks                 String?
+  processedBy             String?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  fee                     StudentFee  @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+
+  @@index([studentFeeId])
+  @@index([paymentDate])
+  @@index([transactionId])
+}
+
+/// StudentTutorWard model - Student tutoring/mentoring assignment
+model StudentTutorWard {
+  id                      String      @id @default(cuid())
+  studentId               String
+  tutorId                 String      // Reference to Faculty
+  
+  assignmentDate          DateTime    @default(now())
+  startDate               DateTime    @db.Date
+  endDate                 DateTime?   @db.Date
+  
+  status                  String      @default("ACTIVE") // ACTIVE, INACTIVE, COMPLETED, TERMINATED, PAUSED
+  
+  assignmentReason        String?     // Academic support, skill development, counseling, etc.
+  mentorshipPlan          String?     // JSON format - outline of mentorship goals
+  
+  frequencyOfMeeting      Int?        // Times per week/month
+  meetingDuration         Int?        // Minutes
+  
+  lastMeetingDate         DateTime?
+  nextMeetingDate         DateTime?
+  
+  performanceNotes        String?
+  
+  isActive                Boolean     @default(true)
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  student                 Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tutor                   Faculty     @relation("tutorWards", fields: [tutorId], references: [id], onDelete: Restrict)
+  meetingRecords          StudentMeetingRecord[]
+
+  @@unique([studentId, tutorId])
+  @@index([studentId])
+  @@index([tutorId])
+  @@index([status])
+  @@index([startDate])
+}
+
+/// StudentMeetingRecord model - Student-Tutor meeting logs
+model StudentMeetingRecord {
+  id                      String      @id @default(cuid())
+  tutorWardId             String
+  
+  meetingDate             DateTime
+  duration                Int         // Minutes
+  
+  topics                  String[]    @default([])
+  notes                   String?
+  
+  studentProgress         String?     // Feedback on student
+  discussionPoints        String?     // Topics discussed
+  
+  nextActionItems         String?
+  nextMeetingScheduled    DateTime?
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  // Relations
+  tutorWard               StudentTutorWard @relation(fields: [tutorWardId], references: [id], onDelete: Cascade)
+
+  @@index([tutorWardId])
+  @@index([meetingDate])
+}
+
+// ============================================================================
+// SYSTEM CONFIGURATION MODELS
+// ============================================================================
+
+/// SystemSetting model - Global system configuration
+model SystemSetting {
+  id                      String      @id @default(cuid())
+  key                     String      @unique
+  value                   String
+  description             String?
+  valueType               String      // string, number, boolean, json
+  isEncrypted             Boolean     @default(false)
+  
+  updatedAt               DateTime    @updatedAt
+  updatedBy               String?
+
+  @@index([key])
+}
+
+/// ApiKey model - API authentication keys
+model ApiKey {
+  id                      String      @id @default(cuid())
+  key                     String      @unique
+  name                    String
+  description             String?
+  
+  userId                  String?
+  permissions             String[]    @default([])
+  
+  lastUsedAt              DateTime?
+  expiresAt               DateTime?
+  isActive                Boolean     @default(true)
+  
+  createdAt               DateTime    @default(now())
+
+  @@index([key])
+  @@index([isActive])
+}
+
+// ============================================================================
+// TASK MANAGEMENT MODELS - See earlier Task model definition above
+// ============================================================================
+
+/// TaskAssignment model - Individual task assignments
+model TaskAssignment {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  assignedToId            String
+  assignedToType          String      // FACULTY, STUDENT, GROUP
+  
+  // Assignment Details
+  assignmentDate          DateTime    @default(now())
+  acceptanceDate          DateTime?
+  completionDate          DateTime?
+  
+  // Status
+  assignmentStatus        String      @default("PENDING") // PENDING, ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, OVERDUE
+  acceptanceStatus        String      @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  
+  // Progress
+  progressPercentage      Int         @default(0)
+  progressNotes           String?
+  
+  // Deadline
+  individualDueDate       DateTime?   @db.Date
+  reminderSent            Boolean     @default(false)
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  assignedTo              User        @relation("assignedTasks", fields: [assignedToId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@unique([taskId, assignedToId])
+  @@index([taskId])
+  @@index([assignedToId])
+  @@index([assignmentStatus])
+}
+
+/// TaskGroup model - Group of tasks or recipients
+model TaskGroup {
+  id                      String      @id @default(cuid())
+  name                    String
+  description             String?
+  groupType               String      // FACULTY_GROUP, STUDENT_GROUP, CLASS_GROUP, DEPARTMENT_GROUP
+  
+  // Details
+  departmentId            String?
+  createdById             String
+  
+  // Configuration
+  isActive                Boolean     @default(true)
+  
+  // Relations
+  members                 TaskGroupMember[]
+  assignments             TaskGroupAssignment[]
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([createdById])
+  @@index([groupType])
+  @@index([isActive])
+}
+
+/// TaskGroupMember model - Members of task groups
+model TaskGroupMember {
+  id                      String      @id @default(cuid())
+  groupId                 String
+  memberId                String
+  memberType              String      // FACULTY, STUDENT
+  
+  // Relations
+  group                   TaskGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member                  User        @relation("groupMembers", fields: [memberId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  
+  @@unique([groupId, memberId])
+  @@index([groupId])
+  @@index([memberId])
+}
+
+/// TaskGroupAssignment model - Assigning tasks to groups
+model TaskGroupAssignment {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  groupId                 String
+  
+  // Status
+  assignmentStatus        String      @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  
+  // Tracking
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  group                   TaskGroup   @relation(fields: [groupId], references: [id])
+  
+  @@unique([taskId, groupId])
+  @@index([taskId])
+  @@index([groupId])
+}
+
+/// TaskApproval model - Approval workflow
+model TaskApproval {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  approverUserId          String
+  
+  // Approval Details
+  approvalRequired        Boolean     @default(true)
+  approvalType            String      @default("AUTOMATIC") // AUTOMATIC, MANUAL, CONDITIONAL
+  approvalLevel           Int         @default(1)
+  
+  // Status
+  approvalStatus          String      @default("PENDING") // PENDING, APPROVED, REJECTED, AWAITING_REVISION
+  approvedAt              DateTime?
+  
+  // Feedback
+  approvalComments        String?
+  rejectionReason         String?
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  approver                User        @relation("approvingTasks", fields: [approverUserId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([taskId])
+  @@index([approverUserId])
+  @@index([approvalStatus])
+}
+
+/// TaskEvidence model - Evidence/submissions for tasks
+model TaskEvidence {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  submittedById           String
+  
+  // Evidence Details
+  title                   String
+  description             String?
+  evidenceType            String      // FILE, URL, TEXT, IMAGE, VIDEO, LINK
+  
+  // Files/Links
+  fileUrl                 String?
+  fileName                String?
+  fileSize                Int?        // In bytes
+  fileType                String?
+  
+  // Link/Text Evidence
+  externalLink            String?
+  textContent             String?
+  
+  // Metadata
+  uploadedAt              DateTime    @default(now())
+  
+  // Verification
+  isVerified              Boolean     @default(false)
+  verifiedBy              String?
+  verifiedAt              DateTime?
+  verificationComments    String?
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  submittedBy             User        @relation("submittedEvidence", fields: [submittedById], references: [id])
+  verifier                User?       @relation("verifiedEvidence", fields: [verifiedBy], references: [id])
+  
+  @@index([taskId])
+  @@index([submittedById])
+  @@index([isVerified])
+}
+
+/// TaskComment model - Comments and discussions
+model TaskComment {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  commentedById           String
+  
+  // Comment Details
+  content                 String
+  commentType             String      @default("GENERAL") // GENERAL, UPDATE, FEEDBACK, QUESTION
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  commentedBy             User        @relation("taskComments", fields: [commentedById], references: [id])
+  
+  // Timestamps
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([taskId])
+  @@index([commentedById])
+}
+
+/// TaskNotification model - Notifications for tasks
+model TaskNotification {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  recipientId             String
+  
+  // Notification Details
+  title                   String
+  message                 String
+  notificationType        String      // ASSIGNMENT, APPROVAL, COMPLETION, OVERDUE, ESCALATION, COMMENT
+  
+  // Status
+  isRead                  Boolean     @default(false)
+  readAt                  DateTime?
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  recipient               User        @relation("notifications", fields: [recipientId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  
+  @@index([taskId])
+  @@index([recipientId])
+  @@index([isRead])
+}
+
+/// TaskEscalation model - Escalation tracking
+model TaskEscalation {
+  id                      String      @id @default(cuid())
+  taskId                  String
+  escalatedById           String
+  
+  // Escalation Details
+  escalationReason        String
+  escalationLevel         Int         @default(1) // 1, 2, 3, etc.
+  targetUserId            String?     // Next level escalation target
+  
+  // Status
+  escalationStatus        String      @default("PENDING") // PENDING, ACKNOWLEDGED, RESOLVED, REJECTED
+  resolvedAt              DateTime?
+  
+  // Resolution
+  resolutionNotes         String?
+  
+  // Relations
+  // task removed - Task doesn't have back-relation
+  escalatedBy             User        @relation("escalatedTasks", fields: [escalatedById], references: [id])
+  targetUser              User?       @relation("receivedEscalations", fields: [targetUserId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([taskId])
+  @@index([escalatedById])
+  @@index([escalationStatus])
+}
+
+// ============================================================================
+// TASK CONFIGURATION MODELS
+// ============================================================================
+
+/// TaskEscalationMatrix model - Escalation rules configuration
+model TaskEscalationMatrix {
+  id                      String      @id @default(cuid())
+  
+  // Configuration
+  taskType                String
+  priority                String
+  departmentId            String?
+  
+  // Escalation Rules
+  level1UserId            String?     // First escalation level
+  level2UserId            String?     // Second escalation level
+  level3UserId            String?     // Third escalation level
+  
+  // Thresholds
+  escalateAfterDaysOverdue Int        @default(3)
+  escalateOnProgressZero  Boolean     @default(true)
+  escalateOnNoUpdate      Int?        // Days without update
+  
+  // Relations
+  level1User              User?       @relation("escalationLevel1", fields: [level1UserId], references: [id])
+  level2User              User?       @relation("escalationLevel2", fields: [level2UserId], references: [id])
+  level3User              User?       @relation("escalationLevel3", fields: [level3UserId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@unique([taskType, priority, departmentId])
+  @@index([taskType])
+}
+
+/// TaskTemplate model - Reusable task templates
+model TaskTemplate {
+  id                      String      @id @default(cuid())
+  
+  // Template Details
+  name                    String
+  description             String?
+  
+  // Task Configuration
+  taskType                String
+  priority                String      @default("MEDIUM")
+  defaultDuration         Int?        // Days
+  
+  // Requirements
+  requiresApproval        Boolean     @default(false)
+  requiresEvidence        Boolean     @default(false)
+  
+  // Status
+  isActive                Boolean     @default(true)
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([isActive])
+}
+
+// ============================================================================
+// ACCREDITATION MODULE
+// ============================================================================
+
+/// AccreditationBody model - Accreditation bodies (NBA, NAAC, UGC, AICTE, IQAC)
+model AccreditationBody {
+  id                      String      @id @default(cuid())
+  name                    String      @unique // NBA, NAAC, UGC, AICTE, IQAC
+  fullName                String
+  description             String?
+  websiteUrl              String?
+  
+  // Relations
+  criteria                AccreditationCriteria[]
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([name])
+}
+
+/// AccreditationCriteria model - Criteria for accreditation
+model AccreditationCriteria {
+  id                      String      @id @default(cuid())
+  bodyId                  String
+  criteriaCode            String      // NBA-1.1, NAAC-2.3, etc.
+  criteriaTitle           String
+  description             String?
+  evidenceRequirements    String?
+  
+  // Relations
+  body                    AccreditationBody @relation(fields: [bodyId], references: [id], onDelete: Cascade)
+  mappings                AccreditationCriteriaMapping[]
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@unique([bodyId, criteriaCode])
+  @@index([bodyId])
+  @@index([criteriaCode])
+}
+
+/// AccreditationAcademicYear model - Academic year tracking for accreditation
+model AccreditationAcademicYear {
+  id                      String      @id @default(cuid())
+  academicYear            String      @unique // 2025-2026
+  startDate               DateTime
+  endDate                 DateTime
+  isActive                Boolean     @default(false)
+  
+  // Relations
+  mappings                AccreditationCriteriaMapping[]
+  
+  createdAt               DateTime    @default(now())
+  
+  @@index([academicYear])
+  @@index([isActive])
+}
+
+/// AccreditationCriteriaMapping model - Map criteria to faculty/student/department
+model AccreditationCriteriaMapping {
+  id                      String      @id @default(cuid())
+  criteriaId              String
+  academicYearId          String?
+  facultyId               String?
+  studentId               String?
+  departmentId            String?
+  mappingType             String      // FACULTY, STUDENT, DEPARTMENT, PROGRAM
+  description             String?
+  
+  // Relations
+  criteria                AccreditationCriteria @relation(fields: [criteriaId], references: [id], onDelete: Cascade)
+  academicYear            AccreditationAcademicYear? @relation(fields: [academicYearId], references: [id])
+  faculty                 Faculty?    @relation("accreditationMappingFaculty", fields: [facultyId], references: [id])
+  student                 Student?    @relation("accreditationMappingStudent", fields: [studentId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@index([criteriaId])
+  @@index([academicYearId])
+  @@index([facultyId])
+  @@index([studentId])
+  @@index([mappingType])
+}
+
+/// AccreditationFacultyMapping model - Track faculty assignments
+model AccreditationFacultyMapping {
+  id                      String      @id @default(cuid())
+  facultyId               String
+  academicYear            String
+  assignedCriteria        String[]    // Array of criteria codes
+  mappingStatus           String      @default("ACTIVE") // ACTIVE, PENDING, COMPLETED
+  compliancePercentage    Int         @default(0)
+  evidenceCount           Int         @default(0)
+  
+  // Relations
+  faculty                 Faculty     @relation("accreditationFacultyMap", fields: [facultyId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@unique([facultyId, academicYear])
+  @@index([facultyId])
+  @@index([academicYear])
+  @@index([mappingStatus])
+}
+
+/// AccreditationStudentMapping model - Track student assignments
+model AccreditationStudentMapping {
+  id                      String      @id @default(cuid())
+  studentId               String
+  academicYear            String
+  program                 String
+  assignedCriteria        String[]    // Array of criteria codes
+  mappingStatus           String      @default("ACTIVE") // ACTIVE, PENDING, COMPLETED
+  compliancePercentage    Int         @default(0)
+  evidenceCount           Int         @default(0)
+  
+  // Relations
+  student                 Student     @relation("accreditationStudentMap", fields: [studentId], references: [id])
+  
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  
+  @@unique([studentId, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+  @@index([mappingStatus])
+}
+
+/// AccreditationReport model - Generated reports
+model AccreditationReport {
+  id                      String      @id @default(cuid())
+  reportName              String
+  bodyType                String      // NBA, NAAC, UGC, AICTE, IQAC
+  academicYear            String
+  generatedByUserId       String
+  reportFormat            String      @default("PDF") // PDF, EXCEL, JSON
+  fileUrl                 String?
+  
+  // Metrics
+  totalCriteria           Int
+  mappedCriteria          Int
+  evidenceCount           Int
+  complianceRate          Int
+  
+  // Status
+  status                  String      @default("DRAFT") // DRAFT, GENERATED, APPROVED, SUBMITTED
+  remarks                 String?
+  
+  // Relations
+  // generatedBy removed - User doesn't have back-relation defined
+  
+  generatedAt             DateTime    @default(now())
+  approvedAt              DateTime?
+  
+  @@index([bodyType])
+  @@index([academicYear])
+  @@index([status])
+  @@index([generatedAt])
+}
+
+/// AccreditationAlert model - Missing evidence alerts
+model AccreditationAlert {
+  id                      String      @id @default(cuid())
+  mappingId               String
+  alertType               String      // MISSING_EVIDENCE, PENDING_VERIFICATION, EXPIRED_EVIDENCE, INCOMPLETE_MAPPING
+  severity                String      // LOW, MEDIUM, HIGH, CRITICAL
+  message                 String
+  status                  String      @default("ACTIVE") // ACTIVE, RESOLVED, ACKNOWLEDGED
+  
+  // Resolution
+  resolvedByUserId        String?
+  resolutionNotes         String?
+  
+  // Relations
+  // mapping removed - AccreditationCriteriaMapping doesn't have back-relation
+  // resolvedBy removed - User doesn't have back-relation defined
+  
+  createdAt               DateTime    @default(now())
+  resolvedAt              DateTime?
+  
+  @@index([mappingId])
+  @@index([severity])
+  @@index([status])
+  @@index([alertType])
+}
+
+// Update User model to include accreditation relations
+// (Add to existing User model relations)
