@@ -46,14 +46,26 @@ try {
     });
   });
 
-  // Root endpoint
+  // Serve static files
+  app.use(express.static('public'));
+
+  // Root endpoint - serve index.html
   app.get('/', (req: any, res: any) => {
-    res.status(200).json({
-      message: 'Department360 Academic Dashboard API',
-      status: 'running',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV,
-    });
+    const path = require('path');
+    const fs = require('fs');
+    const filePath = path.join(process.cwd(), 'public', 'index.html');
+    
+    try {
+      const html = fs.readFileSync(filePath, 'utf8');
+      res.status(200).set('Content-Type', 'text/html').send(html);
+    } catch (error) {
+      res.status(200).json({
+        message: 'Department360 Academic Dashboard API',
+        status: 'running',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV,
+      });
+    }
   });
 
   // Try to import and use the full app routes
